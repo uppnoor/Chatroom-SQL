@@ -2,8 +2,12 @@
 
 <body class="container mt-5">
     <h2 class="mb-4">Your Chatrooms</h2>
-    
+    <a href="/" class="btn btn-secondary text-white">Home</a>
+    <!-- New Chat button -->
+    <a href="/create-chatroom" class="btn btn-primary text-white">New Chat</a>
+
     <div>
+        <!-- existing code for listing the user's rooms -->
         <% if (rooms && rooms.length > 0) { %>
             <p>You have <%= rooms.length %> chatroom(s).</p>
             <ul>
@@ -12,13 +16,9 @@
                 <% }) %>
             </ul>
         <% } else { %>
-            <br>
             <p>You have no chatrooms.</p>
         <% } %>
-        <a href="/create-chatroom" class="btn btn-primary text-white">New Chat</a>
     </div>
-    <br>
-    <a href="/" class="btn btn-secondary text-white">Home</a>
 </body>
 
 <%- include('footer') %>
