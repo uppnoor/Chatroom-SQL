@@ -87,7 +87,7 @@ app.get('/login', (req, res) => {
 });
 
 app.get('/chats', sessionValidation, (req, res) => {
-    const userId = req.session.userId; // from the session
+    const userId = req.session.userId;
     if (!userId) {
         return res.redirect('/login?error=Please log in again');
     }
@@ -177,9 +177,8 @@ app.post('/create-chatroom', sessionValidation, (req, res) => {
             return res.status(500).send('Server error');
         }
 
-        const newRoomId = result.insertId; // The newly created room_id
+        const newRoomId = result.insertId;
 
-        // Insert a record into room_user to link this user to the new room
         const insertRoomUserQuery = `
             INSERT INTO room_user (user_id, room_id)
             VALUES (?, ?)
@@ -190,7 +189,6 @@ app.post('/create-chatroom', sessionValidation, (req, res) => {
                 return res.status(500).send('Server error');
             }
 
-            // Redirect back to /chats (or wherever you want)
             res.redirect('/chats');
         });
     });
