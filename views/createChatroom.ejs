@@ -1,29 +1,23 @@
 <%- include('header') %>
 
-<body class="container mt-5">
-    <h2 class="mb-4">Create New Chat</h2>
+    <body class="container mt-5">
+        <h2 class="mb-4">Create New Chat</h2>
 
-    <% if (error) { %>
-      <div class="alert alert-danger"><%= error %></div>
-    <% } %>
+        <% if (error) { %>
+            <div class="alert alert-danger">
+                <%= error %>
+            </div>
+            <% } %>
 
-    <form action="/create-chatroom" method="POST">
-        <div class="form-group">
-            <label for="name">Chat Room Name:</label>
-            <input 
-                type="text" 
-                class="form-control" 
-                name="name" 
-                id="name"
-                placeholder="e.g. My Awesome Chat"
-                required
-            />
-        </div>
+                <form action="/create-chatroom" method="POST">
+                    <div class="form-group">
+                        <label for="name">Chat Room Name:</label>
+                        <input type="text" class="form-control" name="name" id="name" placeholder="e.g. My Awesome Chat"
+                            required />
+                    </div>
 
-        <!-- Add other fields if needed, e.g. a description, password, etc. -->
+                    <button type="submit" class="btn btn-primary mt-3">Create Chatroom</button>
+                </form>
+    </body>
 
-        <button type="submit" class="btn btn-primary mt-3">Create Chatroom</button>
-    </form>
-</body>
-
-<%- include('footer') %>
+    <%- include('footer') %>

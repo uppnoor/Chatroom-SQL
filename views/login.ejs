@@ -1,25 +1,27 @@
 <%- include('header') %>
 
-<body class="container mt-5">
-    <h2 class="mb-4">Log In Here</h2>
+    <body class="container mt-5">
+        <h2 class="mb-4">Log In Here</h2>
 
-    <form action="/login-submit" method="POST" class="mb-4">
+        <form action="/login-submit" method="POST" class="mb-4">
+            <div class="mb-3">
+                <label for="email" class="form-label">Email:</label>
+                <input name="iden" class="form-control">
+            </div>
+
+            <div class="mb-3">
+                <label for="password" class="form-label">Password:</label>
+                <input type="password" id="password" name="password" class="form-control">
+            </div>
+
+            <button type="submit" class="btn btn-primary">Log In</button>
+        </form>
+
         <div class="mb-3">
-            <label for="email" class="form-label">Email:</label>
-            <input name="iden" class="form-control">
+            <%=error%>
         </div>
 
-        <div class="mb-3">
-            <label for="password" class="form-label">Password:</label>
-            <input type="password" id="password" name="password" class="form-control">
-        </div>
+        <a href="/" class="btn btn-secondary text-white">Home</a>
+    </body>
 
-        <button type="submit" class="btn btn-primary">Log In</button>
-    </form>
-
-    <div class="mb-3"><%=error%></div>
-
-    <a href="/" class="btn btn-secondary text-white">Home</a>
-</body>
-
-<%- include('footer') %>
+    <%- include('footer') %>

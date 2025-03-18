@@ -1,0 +1,64 @@
+<%- include('header') %>
+
+    <body class="container mt-5">
+        <div class="d-flex justify-content-between align-items-center">
+            <h2>
+                <%= room.name %>
+            </h2>
+            <!-- Invite People button -->
+            <a href="/room/<%= room.room_id %>/invite" class="btn btn-warning">
+                Invite People
+            </a>
+        </div>
+
+        <hr>
+
+        <!-- Mark all as read button -->
+        <form action="/room/<%= room.room_id %>/dismissUnreadBar" method="POST" class="mb-3">
+            <button type="submit" class="btn btn-info">
+                Mark All as Read
+            </button>
+        </form>
+
+        <!-- Messages List -->
+        <div id="messages">
+            <% if (messages && messages.length> 0) { %>
+                <!-- We'll track whether we've shown the "unread bar" yet. -->
+                <% let unreadBarShown=false; %>
+
+                    <% messages.forEach(msg=> { %>
+                        <!-- If this message's ID is greater than lastReadId, show the bar (only once). -->
+                        <% if (!unreadBarShown && msg.message_id> lastReadId) { %>
+                            <div class="alert alert-info" role="alert">
+                                <strong>Unread Messages Start Here</strong>
+                            </div>
+                            <% unreadBarShown=true; %>
+                                <% } %>
+
+                                    <div class="mb-2">
+                                        <strong>
+                                            <%= msg.username %>:
+                                        </strong>
+                                        <%= msg.text %>
+                                            <small class="text-muted">(<%= msg.sent_datetime %>)</small>
+                                    </div>
+                                    <% }) %>
+                                        <% } else { %>
+                                            <p>No messages yet.</p>
+                                            <% } %>
+        </div>
+
+        <!-- Send Message Form -->
+        <form action="/room/<%= room.room_id %>/sendMessage" method="POST" class="mt-4">
+            <div class="form-group">
+                <label for="messageText">Your Message:</label>
+                <input type="text" name="messageText" id="messageText" class="form-control"
+                    placeholder="Type a message..." required />
+            </div>
+            <button type="submit" class="btn btn-primary mt-2">Send</button>
+        </form>
+
+        <a href="/chats" class="btn btn-secondary text-white mt-4">Back to Chats</a>
+    </body>
+
+    <%- include('footer') %>

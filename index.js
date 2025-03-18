@@ -22,7 +22,7 @@ function sessionValidation(req, res, next) {
     }
 }
 
-const expireTime = 24 * 60 * 60 * 1000; 
+const expireTime = 24 * 60 * 60 * 1000;
 const session_secret = process.env.NODE_SESSION_SECRET;
 const mongo_password = process.env.MONGO_PASSWORD;
 const mongo_user = process.env.MONGO_USER;
@@ -43,24 +43,24 @@ const db = mysql.createConnection({
     password: mysql_password,
     database: 'chatrooms',
     ssl: {
-      rejectUnauthorized: true,
-      ca: process.env.MYSQL_CA_CERT,
+        rejectUnauthorized: true,
+        ca: process.env.MYSQL_CA_CERT,
     },
-  });
+});
 
 db.connect(err => {
     if (err) {
-        console.error('Database connection failed: ' + err.stack);
+        console.error("MySQL connection error:", err);
         return;
     }
     console.log('Connected to MySQL database.');
 });
 
-app.use(session({ 
+app.use(session({
     secret: session_secret,
-	store: mongoStore,
-	saveUninitialized: false, 
-	resave: true,
+    store: mongoStore,
+    saveUninitialized: false,
+    resave: true,
     cookie: {
         maxAge: expireTime,
         httpOnly: true
@@ -68,32 +68,39 @@ app.use(session({
 }));
 
 app.get('/', (req, res) => {
-    if(req.session.authenticated) {
+    if (req.session.authenticated) {
         const username = req.session.username;
         res.render('loggedIn', { username });
     } else {
-        res.render('index')
+        res.render('index');
     }
 });
 
 app.get('/signup', (req, res) => {
-    var error = req.query.error
+    var error = req.query.error;
     res.render('signup', { error });
 });
 
 app.get('/login', (req, res) => {
-    var error = req.query.error
+    var error = req.query.error;
     res.render('login', { error });
 });
 
 app.get('/chats', sessionValidation, (req, res) => {
     const userId = req.session.userId;
-    if (!userId) {
-        return res.redirect('/login?error=Please log in again');
-    }
 
     const query = `
-        SELECT r.room_id, r.name
+        SELECT 
+            r.room_id, 
+            r.name,
+            COALESCE((
+                SELECT COUNT(*)
+                FROM message m
+                JOIN room_user ru2 
+                  ON m.room_user_id = ru2.room_user_id
+                WHERE ru2.room_id = r.room_id
+                  AND m.message_id > COALESCE(ru.last_read_message, 0)
+            ), 0) AS unread_count
         FROM room r
         JOIN room_user ru ON r.room_id = ru.room_id
         WHERE ru.user_id = ?
@@ -101,10 +108,9 @@ app.get('/chats', sessionValidation, (req, res) => {
 
     db.query(query, [userId], (err, rooms) => {
         if (err) {
-            console.error('Error fetching user rooms:', err);
+            console.error("MySQL error in /chats route:", err);
             return res.status(500).send('Server error');
         }
-
         res.render('chats', { rooms });
     });
 });
@@ -131,7 +137,7 @@ app.post('/signup-submit', async (req, res) => {
 
     db.query(checkEmailQuery, [iden], (err, result) => {
         if (err) {
-            console.error('Error querying email:', err);
+            console.error('MySQL error checking email:', err);
             return res.status(500).send('Server error');
         }
 
@@ -146,7 +152,7 @@ app.post('/signup-submit', async (req, res) => {
 
         db.query(insertUserQuery, [username, iden, hashedPassword], (err) => {
             if (err) {
-                console.error('Error inserting user:', err);
+                console.error('MySQL error inserting user:', err);
                 return res.status(500).send('Error signing up');
             }
             return res.redirect('/login');
@@ -159,8 +165,8 @@ app.get('/create-chatroom', sessionValidation, (req, res) => {
 });
 
 app.post('/create-chatroom', sessionValidation, (req, res) => {
-    const userId = req.session.userId;  
-    const { name } = req.body;          
+    const userId = req.session.userId;
+    const { name } = req.body;
 
     if (!name) {
         return res.render('createChatroom', { error: 'Please enter a room name.' });
@@ -173,7 +179,7 @@ app.post('/create-chatroom', sessionValidation, (req, res) => {
 
     db.query(insertRoomQuery, [name], (err, result) => {
         if (err) {
-            console.error('Error inserting new room:', err);
+            console.error("MySQL error inserting new room:", err);
             return res.status(500).send('Server error');
         }
 
@@ -185,7 +191,7 @@ app.post('/create-chatroom', sessionValidation, (req, res) => {
         `;
         db.query(insertRoomUserQuery, [userId, newRoomId], (err2) => {
             if (err2) {
-                console.error('Error inserting into room_user:', err2);
+                console.error("MySQL error inserting into room_user:", err2);
                 return res.status(500).send('Server error');
             }
 
@@ -205,7 +211,7 @@ app.post('/login-submit', async (req, res) => {
 
     db.query(loginUserQuery, [iden], async (err, results) => {
         if (err) {
-            console.error('Error checking user:', err);
+            console.error('MySQL error in login-submit:', err);
             return res.status(500).send('Error logging in');
         }
 
@@ -235,11 +241,210 @@ app.post('/login-submit', async (req, res) => {
     });
 });
 
+app.get('/room/:id', sessionValidation, (req, res) => {
+    const roomId = req.params.id;
+    const userId = req.session.userId;
 
+    const getRoomUser = `
+      SELECT room_user_id, last_read_message
+      FROM room_user
+      WHERE room_id = ? AND user_id = ?
+    `;
+    db.query(getRoomUser, [roomId, userId], (err, ruResults) => {
+        if (err) {
+            console.error("MySQL error retrieving room_user record:", err);
+            return res.status(500).send('Server error');
+        }
+        if (!ruResults.length) {
+            return res.status(403).send('Not in this room');
+        }
+
+        const { room_user_id, last_read_message } = ruResults[0];
+
+        const messagesQuery = `
+          SELECT 
+            m.message_id,
+            m.text,
+            m.sent_datetime,
+            u.username
+          FROM message m
+          JOIN room_user ru ON m.room_user_id = ru.room_user_id
+          JOIN user u       ON ru.user_id = u.user_id
+          WHERE ru.room_id = ?
+          ORDER BY m.sent_datetime ASC
+        `;
+        db.query(messagesQuery, [roomId], (err2, messages) => {
+            if (err2) {
+                console.error("MySQL error retrieving messages:", err2);
+                return res.status(500).send('Server error');
+            }
+
+            db.query('SELECT * FROM room WHERE room_id = ?', [roomId], (err3, roomRes) => {
+                if (err3) {
+                    console.error("MySQL error retrieving room info:", err3);
+                    return res.status(500).send('Server error');
+                }
+                if (!roomRes.length) {
+                    return res.status(404).send('Room not found');
+                }
+                const room = roomRes[0];
+
+                res.render('room', {
+                    room,
+                    messages,
+                    lastReadId: last_read_message,
+                    roomUserId: room_user_id
+                });
+            });
+        });
+    });
+});
+
+app.post('/room/:id/sendMessage', (req, res) => {
+    const { messageText } = req.body;
+    const roomId = req.params.id;
+    const userId = req.session.userId;
+
+    const getRoomUserId = `
+        SELECT room_user_id
+        FROM room_user
+        WHERE user_id = ? AND room_id = ?
+    `;
+    db.query(getRoomUserId, [userId, roomId], (err, results) => {
+        if (err) {
+            console.error("MySQL error finding room_user_id:", err);
+            return res.status(500).send('Server error');
+        }
+        if (!results.length) {
+            return res.status(403).send('You are not in this room');
+        }
+
+        const myRoomUserId = results[0].room_user_id;
+
+        const insertMessage = `
+            INSERT INTO message (room_user_id, sent_datetime, text)
+            VALUES (?, NOW(), ?)
+        `;
+        db.query(insertMessage, [myRoomUserId, messageText], (err2, result) => {
+            if (err2) {
+                console.error("MySQL error inserting message:", err2);
+                return res.status(500).send('Server error');
+            }
+
+            const newMessageId = result.insertId;
+            const updateLastRead = `
+                UPDATE room_user
+                SET last_read_message = ?
+                WHERE room_user_id = ?
+            `;
+            db.query(updateLastRead, [newMessageId, myRoomUserId], (err3) => {
+                if (err3) {
+                    console.error("MySQL error updating last_read_message:", err3);
+                }
+                return res.redirect(`/room/${roomId}`);
+            });
+        });
+    });
+});
+
+
+app.get('/room/:id/invite', sessionValidation, (req, res) => {
+    const roomId = req.params.id;
+
+    const roomQuery = 'SELECT * FROM room WHERE room_id = ?';
+    db.query(roomQuery, [roomId], (err, roomResults) => {
+        if (err) {
+            console.error("MySQL error in /room/:id/invite GET:", err);
+            return res.status(500).send('Server error');
+        }
+        if (roomResults.length === 0) {
+            return res.status(404).send('Room not found');
+        }
+        const room = roomResults[0];
+        res.render('invite', { room, error: null });
+    });
+});
+
+app.post('/room/:id/invite', sessionValidation, (req, res) => {
+    const roomId = req.params.id;
+    const { username } = req.body;
+
+    if (!username) {
+        return res.render('invite', {
+            room: { room_id: roomId, name: 'Room name if needed' },
+            error: 'Please enter a username.'
+        });
+    }
+
+    const userQuery = 'SELECT user_id FROM user WHERE username = ?';
+    db.query(userQuery, [username], (err, userResults) => {
+        if (err) {
+            console.error("MySQL error finding user in invite POST:", err);
+            return res.status(500).send('Server error');
+        }
+        if (userResults.length === 0) {
+            return res.render('invite', {
+                room: { room_id: roomId, name: 'Room name if needed' },
+                error: 'User not found.'
+            });
+        }
+
+        const invitedUserId = userResults[0].user_id;
+
+        const insertRoomUser = `
+            INSERT INTO room_user (user_id, room_id)
+            VALUES (?, ?)
+        `;
+        db.query(insertRoomUser, [invitedUserId, roomId], (err2) => {
+            if (err2) {
+                console.error("MySQL error inserting invite:", err2);
+                return res.status(500).send('Server error');
+            }
+            res.redirect(`/room/${roomId}`);
+        });
+    });
+});
+
+app.post('/room/:id/dismissUnreadBar', sessionValidation, (req, res) => {
+    const roomId = req.params.id;
+    const userId = req.session.userId;
+
+    const lastMsgQuery = `
+      SELECT m.message_id AS latestId
+      FROM message m
+      JOIN room_user ru ON ru.room_user_id = m.room_user_id
+      WHERE ru.room_id = ?
+      ORDER BY m.sent_datetime DESC
+      LIMIT 1
+    `;
+    db.query(lastMsgQuery, [roomId], (err, results) => {
+        if (err) {
+            console.error("MySQL error retrieving most recent message:", err);
+            return res.status(500).send('Server error');
+        }
+        if (!results.length) {
+            return res.redirect(`/room/${roomId}`);
+        }
+        const latestMsgId = results[0].latestId;
+
+        const updateQuery = `
+          UPDATE room_user
+          SET last_read_message = ?
+          WHERE user_id = ? AND room_id = ?
+        `;
+        db.query(updateQuery, [latestMsgId, userId, roomId], (err2) => {
+            if (err2) {
+                console.error("MySQL error updating last_read_message:", err2);
+                return res.status(500).send('Server error');
+            }
+            res.redirect(`/room/${roomId}`);
+        });
+    });
+});
 
 app.get('*', (req, res) => {
-    res.status(404)
-    res.render('404')
+    res.status(404);
+    res.render('404');
 });
 
 app.listen(port, () => {

@@ -1,0 +1,25 @@
+<%- include('header') %>
+
+    <body class="container mt-5">
+        <h2>Invite a User to <%= room.name %>
+        </h2>
+
+        <% if (error) { %>
+            <div class="alert alert-danger">
+                <%= error %>
+            </div>
+            <% } %>
+
+                <form action="/room/<%= room.room_id %>/invite" method="POST">
+                    <div class="form-group">
+                        <label for="username">Username to invite:</label>
+                        <input type="text" name="username" id="username" class="form-control"
+                            placeholder="Enter username..." required />
+                    </div>
+                    <button type="submit" class="btn btn-primary mt-3">Invite</button>
+                </form>
+
+                <a href="/room/<%= room.room_id %>" class="btn btn-secondary mt-3">Back to Room</a>
+    </body>
+
+    <%- include('footer') %>
